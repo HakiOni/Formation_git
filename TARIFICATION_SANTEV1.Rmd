@@ -1,0 +1,726 @@
+---
+title: "TARIFICATION SANTE"
+output: html_vignette
+params:
+  chem2019: C:/Users/hakim.sabi/Desktop/SAUVEGARDE/Information de travail/MCI_2019/
+  chem2019_suite: C:/Users/hakim.sabi/Desktop/SAUVEGARDE/Information de travail/MCI_2019_SUITE/
+  chem2020: C:/Users/hakim.sabi/Desktop/SAUVEGARDE/Information de travail/MCI_2020/
+  chem2021: C:/Users/hakim.sabi/Desktop/SAUVEGARDE/Information de travail/MCI_2021/
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+IMPORTATION DES LIBRAIRIES
+
+
+```{r echo = FALSE, message=FALSE,warning=TRUE}
+
+Install_And_Load <- function(packages) {
+  k <- packages[!(packages %in% installed.packages()[,"Package"])];
+  if(length(k))
+  {install.packages(k, repos='https://cran.rstudio.com/',dep=T);}
+  
+  for(package_name in packages)
+  {library(package_name,character.only=TRUE, quietly = TRUE);}
+}
+  #Exécution et lecture des package attendues##
+list_packages=c('openxlsx','tidyverse','dplyr','plyr','ggplot2','readxl', 'readr', 'knitr','labelled', 'rlist','lubridate','expss','xlsx','cowplot','plotly','gridExtra','scales','arrow')
+Install_And_Load(list_packages)
+
+```
+
+
+
+
+Base sinistres
+
+
+```{r}
+#--2019
+filenames<-list.files(params$chem2019)
+base_in2019<- do.call("rbind", lapply(filenames, 
+                        function(x) read_excel(paste0(params$chem2019,x,sep=""))[,c("DATECLOTURE","Numero","CodGar","Garant","CodeSouscr","Souscripteur","N","Police" ,"MatriculeP","Patient","Statut","DATENAIS","MatriculeA","Assure","Centre_Executant","Centre_Prescipteur","Prestations","Actes","Medecin","DateDeSoin",
+  "CodeAffection","TypeD","Reclamé","BaseDecomptée","TM","Exclusion","Depassement","Remboursé","Part_Patient")]
+                        ),
+        quote= TRUE
+       )
+names(base_in2019) <- toupper(colnames(base_in2019))
+
+
+#--SUITE 2019
+filenames<-list.files(params$chem2019_suite)
+base_in2019_suite<- do.call("rbind", lapply(filenames, 
+                        function(x) read_excel(paste0(params$chem2019_suite,x,sep=""))[,c("Police" ,"MatriculeP","Patient","Statut","DATENAIS","MatriculeA","Assure","Centre_Executant","Centre_Prescipteur","Prestations","DateDeSoin","Remboursé")]%>% mutate(Chemin=substr(x,1,2))
+                        ),
+        quote= TRUE
+       )
+base_in2019_suite <- base_in2019_suite %>% mutate(DATECLOTURE=paste0("2019-",Chemin,"-01"))
+base_in2019_suite$Numero <- ""
+base_in2019_suite$CodGar <- ""
+base_in2019_suite$Garant <- ""
+base_in2019_suite$CodeSouscr <- ""
+base_in2019_suite$Souscripteur <- ""
+base_in2019_suite$N <- ""
+base_in2019_suite$Actes <- ""
+base_in2019_suite$Medecin <- ""
+base_in2019_suite$CodeAffection <- ""
+base_in2019_suite$TypeD <- ""
+base_in2019_suite$Reclamé <- ""
+base_in2019_suite$BaseDecomptée <- ""
+base_in2019_suite$TM <- ""
+base_in2019_suite$Exclusion <- ""
+base_in2019_suite$Depassement <- ""
+base_in2019_suite$Part_Patient <- ""
+base_in2019_suite <- base_in2019_suite [,c("DATECLOTURE","Numero","CodGar","Garant","CodeSouscr","Souscripteur","N","Police" ,"MatriculeP","Patient","Statut","DATENAIS","MatriculeA","Assure","Centre_Executant","Centre_Prescipteur","Prestations","Actes","Medecin","DateDeSoin",
+  "CodeAffection","TypeD","Reclamé","BaseDecomptée","TM","Exclusion","Depassement","Remboursé","Part_Patient")]
+
+names(base_in2019_suite) <- toupper(colnames(base_in2019_suite))
+
+
+#--2020
+filenames<-list.files(params$chem2020)
+base_in2020<- do.call("rbind.fill", lapply(filenames, 
+                        function(x) read_excel(paste0(params$chem2020,x,sep=""),na = "NULL")[,c("DATECLOTURE","Numero","CodGar","Garant","CodeSouscr","Souscripteur","N","Police" ,"MatriculeP","Patient","Statut","DATENAIS","MatriculeA","Assure","Centre_Executant","Centre_Prescipteur","Prestations","Actes","Medecin","DateDeSoin",
+  "CodeAffection","TypeD","Reclamé","BaseDecomptée","TM","Exclusion","Depassement","Remboursé","Part_Patient")]
+                        )
+       )
+names(base_in2020) <- toupper(colnames(base_in2020))
+
+#--2021
+filenames<-list.files(params$chem2021)
+base_in2021<- do.call("rbind", lapply(filenames, 
+                        function(x) read_excel(paste0(params$chem2021,x,sep=""))[,c("DATECLOTURE","Numero","CodGar","Garant","CodeSouscr","Souscripteur","N","Police" ,"MatriculeP","Patient","Statut","DATENAIS","MatriculeA","Assure","Centre_Executant","Centre_Prescipteur","Prestations","Actes","Medecin","DateDeSoin",
+  "CodeAffection","TypeD","Reclamé","BaseDecomptée","TM","Exclusion","Depassement","Remboursé","Part_Patient")]
+                        ),
+        quote= TRUE
+       )
+names(base_in2021) <- toupper(colnames(base_in2021))
+
+#--base_sin_total
+base_in <-rbind(base_in2019_suite,base_in2019,base_in2020,base_in2021) 
+base_in <- base_in[!is.na(base_in$POLICE),]
+base_in$DATEDESOIN <- as.Date(base_in$DATEDESOIN,"%Y-%m-%d")
+base_in <- base_in %>% filter(DATEDESOIN <="2021-12-31" & DATEDESOIN>="2019-01-01")
+
+```
+
+
+
+
+
+```{r}
+#-
+base_in$RECLAMÉ <-as.numeric(base_in$RECLAMÉ)
+base_in$BASEDECOMPTÉE <-as.numeric(base_in$BASEDECOMPTÉE) 
+base_in$TM <-as.numeric(base_in$TM) 
+base_in$EXCLUSION <-as.numeric(base_in$EXCLUSION) 
+base_in$DEPASSEMENT <-as.numeric(base_in$DEPASSEMENT)
+base_in$REMBOURSÉ <-as.numeric(base_in$REMBOURSÉ) 
+base_in$PART_PATIENT <-as.numeric(base_in$PART_PATIENT)
+
+base_in$PARTMOD= base_in$TM/100
+
+baseParmodNa<- base_in[is.na(base_in$PARTMOD),]
+
+baseParmodApure <- base_in[!is.na(base_in$PARTMOD),]
+
+baseParmodNormal<- baseParmodApure[baseParmodApure$PARTMOD<1,]
+
+baseParmodAnormal<- baseParmodApure[baseParmodApure$PARTMOD>=1,]
+
+baseParmodAnormal$PARTMOD <-  baseParmodAnormal$PART_PATIENT/baseParmodAnormal$BASEDECOMPTÉE
+baseParmodCorrige<- baseParmodAnormal
+
+baseParmodCorrige[is.infinite(baseParmodCorrige$PARTMOD)|is.na(baseParmodCorrige$PARTMOD),]$PARTMOD <- mean(baseParmodCorrige[!is.infinite(baseParmodCorrige$PARTMOD),]$PARTMOD, na.rm = T)
+
+# baseParmodCorrige
+# baseParmodNormal
+# baseParmodNa
+base_in<- rbind(baseParmodCorrige,baseParmodNormal,baseParmodNa)
+
+```
+
+
+
+
+```{r}
+#-
+base_in[base_in$MATRICULEP==2210439 & base_in$BASEDECOMPTÉE==50000,]$BASEDECOMPTÉE=800000
+base_in[which((base_in$MATRICULEP==2043501)&(base_in$BASEDECOMPTÉE==0)),]$BASEDECOMPTÉE=160000
+base_in[which((base_in$MATRICULEP==2289493)&(base_in$BASEDECOMPTÉE==0)),]$BASEDECOMPTÉE=25000
+base_in[which((base_in$MATRICULEP==2229085)&(base_in$BASEDECOMPTÉE==-12700)),]$BASEDECOMPTÉE=33000
+base_in[which((base_in$MATRICULEP==2047943)&(base_in$BASEDECOMPTÉE==-12700)),]$BASEDECOMPTÉE=33000
+base_in[which((base_in$MATRICULEP==2253375)&(base_in$BASEDECOMPTÉE==13760)),]$BASEDECOMPTÉE=116200
+base_in[which((base_in$MATRICULEP==2119822)&(base_in$BASEDECOMPTÉE==119999)),]$BASEDECOMPTÉE=240000
+base_in<- base_in[-which((base_in$MATRICULEP==1919588)&(base_in$BASEDECOMPTÉE==150000)),]
+
+#-
+base_in<- base_in[!((base_in$STATUT =='C')&(base_in$MATRICULEP == base_in$MATRICULEA)),]
+base_in<- base_in[!((base_in$STATUT =='E')&(base_in$MATRICULEP == base_in$MATRICULEA)),]
+base_in<- base_in[!((base_in$STATUT =='A')&(base_in$MATRICULEP != base_in$MATRICULEA)),]
+
+#-
+# base_in <- base_in %>% mutate(
+#   PARTMOD = PART_PATIENT/BASEDECOMPTÉE
+# )
+```
+
+
+
+
+
+```{r}
+base<- base_in %>% tidyr::pivot_wider(names_from = PRESTATIONS, values_from  = c(BASEDECOMPTÉE,REMBOURSÉ), values_fn=sum)
+data_arrange <- base %>% group_by(MATRICULEP) %>% dplyr::summarise(
+  N = max(N),
+  MATRICULEA = max(MATRICULEA),
+  DATECLOTURE=max(DATECLOTURE),
+  DATEDESOIN=max(DATEDESOIN),
+  STATUT = max(STATUT),
+  DATENAIS = max(DATENAIS),
+  TM= min(TM),
+  PARTMOD=mean(PARTMOD, na.rm=T),
+  NBSIN_PHAR = sum(!is.na(BASEDECOMPTÉE_PHARMACIE)),
+  NBSIN_CONS = sum(!is.na(BASEDECOMPTÉE_CONSULTATION)),
+  NBSIN_DENT = sum(!is.na(BASEDECOMPTÉE_DENTAIRE)),
+  NBSIN_HOSPIT = sum(!is.na(BASEDECOMPTÉE_HOSPITALISATION)),
+  NBSIN_AM = sum(!is.na(`BASEDECOMPTÉE_AUXILIAIRE MEDICAUX`)),
+  NBSIN_BIO = sum(!is.na(BASEDECOMPTÉE_BIOLOGIE)),
+  NBSIN_IMA = sum(!is.na(`BASEDECOMPTÉE_IMAGERIE & EXAMENS SPECIALISES`)),
+  NBSIN_AEX = sum(!is.na(`BASEDECOMPTÉE_AUTRES EXAMENS`)),
+  NBSIN_OPT = sum(!is.na(BASEDECOMPTÉE_OPTIQUE)),
+  NBSIN_MATER = sum(!is.na(BASEDECOMPTÉE_MATERNITE)),
+  BASEDECOMPTÉE_PHARMACIE = sum(BASEDECOMPTÉE_PHARMACIE, na.rm = T),
+  BASEDECOMPTÉE_CONSULTATION = sum(BASEDECOMPTÉE_CONSULTATION, na.rm = T),
+  BASEDECOMPTÉE_DENTAIRE = sum(BASEDECOMPTÉE_DENTAIRE, na.rm = T),
+  BASEDECOMPTÉE_HOSPITALISATION = sum(BASEDECOMPTÉE_HOSPITALISATION, na.rm = T),
+  `BASEDECOMPTÉE_AUXILIAIRE MEDICAUX` = sum(`BASEDECOMPTÉE_AUXILIAIRE MEDICAUX` , na.rm = T),
+  BASEDECOMPTÉE_BIOLOGIE = sum(BASEDECOMPTÉE_BIOLOGIE , na.rm = T),
+  `BASEDECOMPTÉE_IMAGERIE & EXAMENS SPECIALISES` = sum(`BASEDECOMPTÉE_IMAGERIE & EXAMENS SPECIALISES`  , na.rm = T),
+  `BASEDECOMPTÉE_AUTRES EXAMENS` = sum(`BASEDECOMPTÉE_AUTRES EXAMENS`  , na.rm = T),
+  BASEDECOMPTÉE_OPTIQUE = sum(BASEDECOMPTÉE_OPTIQUE  , na.rm = T),
+  BASEDECOMPTÉE_MATERNITE = sum(BASEDECOMPTÉE_MATERNITE  , na.rm = T),
+  REMBOURSÉ_PHARMACIE = sum(REMBOURSÉ_PHARMACIE, na.rm=T),
+  REMBOURSÉ_CONSULTATION = sum(REMBOURSÉ_CONSULTATION, na.rm=T),
+  REMBOURSÉ_DENTAIRE= sum(REMBOURSÉ_DENTAIRE, na.rm=T),
+  REMBOURSÉ_HOSPITALISATION= sum(REMBOURSÉ_HOSPITALISATION, na.rm=T),
+  `REMBOURSÉ_AUXILIAIRE MEDICAUX`= sum(`REMBOURSÉ_AUXILIAIRE MEDICAUX`, na.rm=T),
+  REMBOURSÉ_BIOLOGIE= sum(REMBOURSÉ_BIOLOGIE, na.rm=T),
+  `REMBOURSÉ_IMAGERIE & EXAMENS SPECIALISES` = sum(`REMBOURSÉ_IMAGERIE & EXAMENS SPECIALISES`, na.rm = T),
+  `REMBOURSÉ_AUTRES EXAMENS`=sum(`REMBOURSÉ_AUTRES EXAMENS`, na.rm = TRUE),
+  REMBOURSÉ_OPTIQUE=sum(REMBOURSÉ_OPTIQUE, na.rm = TRUE),
+  REMBOURSÉ_MATERNITE=sum(REMBOURSÉ_MATERNITE, na.rm = TRUE)
+  )
+
+data_arrange[is.na(data_arrange$PARTMOD),]$PARTMOD = data_arrange[is.na(data_arrange$PARTMOD),]$TM/100
+data_arrange <- data_arrange %>% rowwise(MATRICULEP) %>% dplyr::mutate(NBSIN_TOT = sum(c_across(NBSIN_PHAR:NBSIN_MATER),na.rm = T), .after = NBSIN_MATER)
+data_arrange <- data_arrange %>% rowwise(MATRICULEP) %>% dplyr::mutate(BASEDECOMPTÉE_TOT = sum(c_across(BASEDECOMPTÉE_PHARMACIE:BASEDECOMPTÉE_MATERNITE),na.rm = T), .after = BASEDECOMPTÉE_MATERNITE)
+data_arrange <- data_arrange %>% rowwise(MATRICULEP) %>% dplyr::mutate(REMBOURSE_TOT = sum(c_across(REMBOURSÉ_PHARMACIE:REMBOURSÉ_MATERNITE),na.rm = T), .after = REMBOURSÉ_MATERNITE)
+
+```
+
+
+
+Base de souscription
+
+
+```{r}
+
+bene2019<- read_parquet("BENEFICIAIRES-PROTEGES-SANLAM-2019.parquet")
+bene2020<- read_parquet("BENEFICIAIRES-PROTEGES-SANLAM-2020.parquet")
+bene2021<- read_parquet("BENEFICIAIRES-PROTEGES-SANLAM-2021.parquet")
+
+bene_protege0<- rbind(bene2019,bene2020,bene2021)
+bene_protege0$DATESORTIE[as.Date(bene_protege0$DATESORTIE,"%Y-%m-%d")=="1900-01-01"] <- "2021-12-31"
+
+#- Regroupement suivant des matricules
+bene_protege0 <- bene_protege0 %>% group_by(MATBENEF) %>% dplyr::summarise(
+   NPOL= max(NPOL),
+   MATASSURE=max(MATASSURE),
+   NOM =max(NOM),
+   PRENOMS=max(PRENOMS),
+   GARANT=max(GARANT),
+   CODCOLLEGE=max(CODCOLLEGE),
+   STATUT_ASSURE=max(STATUT_ASSURE),
+   DATEEFFET=min(DATEEFFET),
+   DATESORTIE=max(DATESORTIE),
+   STATUT_RETRAIT=last(STATUT_RETRAIT),
+   DATE_NAISSANCE=max(DATE_NAISSANCE),
+   GENRE=max(GENRE)
+)
+
+
+#-Calcul exposition
+AnneePoliceAcquisition<-function(DateEffet,DateFin,DebutAnnee,FinAnnee)
+{
+  # Renvoie l'année police pour une annee donnees
+  
+  #DebutAnnee = as.Date(paste("01/01/",Annee,sep = ""), "%d/%m/%Y")
+  #FinAnnee= as.Date(paste("31/12/",Annee,sep = ""), "%d/%m/%Y")
+  
+  DebutAnnee = as.Date(DebutAnnee, "%Y-%m-%d")
+  FinAnnee= as.Date(FinAnnee, "%Y-%m-%d")
+  
+  DateEffet =as.Date(DateEffet, "%Y-%m-%d")
+  DateFin =as.Date(DateFin, "%Y-%m-%d")
+  
+  AnneePoliceAcquisition=(DateEffet<=FinAnnee & DateFin>=DebutAnnee)*
+    ((sapply(as.numeric(FinAnnee-DateEffet),FUN=function(x){max(x,0)}) +
+        sapply(as.numeric(DateEffet-DebutAnnee),FUN=function(x){min(x,0)}) + 
+        sapply(as.numeric(DateFin-FinAnnee),FUN=function(x){min(x,0)})+1)/365.25)
+    
+  
+  #  sapply(as.numeric(FinAnnee-DateEffet),FUN=function(x){max(x,0)})
+  
+  # min(as.numeric(DateEffet-DebutAnnee),0)
+}
+
+bene_protege0$EXPOSITION2019 <- AnneePoliceAcquisition(bene_protege0$DATEEFFET,bene_protege0$DATESORTIE,"2019-01-01","2019-12-31")
+bene_protege0$EXPOSITION2020 <- AnneePoliceAcquisition(bene_protege0$DATEEFFET,bene_protege0$DATESORTIE,"2020-01-01","2020-12-31")
+bene_protege0$EXPOSITION2021 <- AnneePoliceAcquisition(bene_protege0$DATEEFFET,bene_protege0$DATESORTIE,"2021-01-01","2021-12-31")
+bene_protege0 <- bene_protege0 %>% mutate(EXPOSITION= EXPOSITION2019+EXPOSITION2020+EXPOSITION2021)
+bene_protege0 <- bene_protege0 %>% filter(EXPOSITION>0)
+```
+
+
+
+```{r}
+bene_protege0$MATBENEF <- as.numeric(bene_protege0$MATBENEF)
+base_in$MATRICULEP <- as.numeric(base_in$MATRICULEP)
+base_Sin_ind<- left_join(bene_protege0,base_in, by=c('MATBENEF'='MATRICULEP'))
+```
+
+
+
+```{r}
+base_f1 <- left_join(bene_protege0, data_arrange, by=c('MATBENEF'='MATRICULEP'))
+```
+
+
+
+```{r}
+
+Sys.setenv(TZ='GMT')
+
+base_f1$DATEEFFET <- as.Date(base_f1$DATEEFFET, "%Y-%m-%d")
+base_f1$DATED <- as.Date("2021-12-31","%Y-%m-%d")
+base_f1$DATEDB <- as.Date("2021-01-01","%Y-%m-%d")
+
+base_f1<- base_f1 %>% mutate(
+  AGE= as.numeric(difftime(DATEDB, DATE_NAISSANCE, units = "days"))/365.25
+)
+base_f1$AGE[base_f1$AGE<0] <- 0
+
+
+base_f1<-base_f1%>% mutate(TERRITTOIRE=str_sub(CODCOLLEGE, -2))
+base_f1[-which(base_f1$TERRITTOIRE %in%c("CI", "ME")),]$TERRITTOIRE="Autre"
+
+
+base_f1<- base_f1 %>% mutate(PARTMOD2=str_extract(CODCOLLEGE,"\\d+"))
+base_f1$PARTMOD[is.na(base_f1$PARTMOD)] <- 1-as.numeric(base_f1$PARTMOD2[is.na(base_f1$PARTMOD)])/100
+base_f1[is.na(base_f1$PARTMOD)|base_f1$PARTMOD<0,]$PARTMOD <- mean(base_f1[!is.na(base_f1$PARTMOD)& base_f1$PARTMOD>0,]$PARTMOD)
+
+
+base_f1 <- base_f1 %>% mutate(
+FRQ_PHAR=NBSIN_PHAR/EXPOSITION,
+FRQ_CONS=NBSIN_CONS/EXPOSITION,
+FRQ_DENT=NBSIN_DENT/EXPOSITION,
+FRQ_HOSPIT=NBSIN_HOSPIT/EXPOSITION,
+FRQ_AM=NBSIN_AM/EXPOSITION,
+FRQ_BIO=NBSIN_BIO/EXPOSITION,
+FRQ_IMA=NBSIN_IMA/EXPOSITION,
+FRQ_AEX=NBSIN_AEX/EXPOSITION,
+FRQ_OPT=NBSIN_OPT/EXPOSITION,
+FRQ_MATER=NBSIN_MATER/EXPOSITION,
+FRQ_TOT=NBSIN_TOT/EXPOSITION
+)
+
+basePass<- base_f1 %>% group_by(MATASSURE) %>%dplyr:: summarise(NOMBRE_PERSONNE = n())
+basePass1 <- base_f1 %>% filter(STATUT_ASSURE=="E") %>% group_by(MATASSURE) %>% dplyr:: summarise(NBRE_ENFANTS=n())
+base_f1 <- base_f1 %>% left_join(basePass, by=c('MATASSURE'='MATASSURE'))
+base_f1 <- base_f1 %>% left_join(basePass1, by=c('MATASSURE'='MATASSURE'))
+
+
+p<- ggplot(base_f1, aes(x=AGE))+geom_histogram(aes(y=..density..), breaks = seq(0,100,by=5), fill="Royalblue", colour="black")+geom_density()
+
+base_f1<- base_f1 %>% mutate(TRANCHEAGE=case_when(AGE<=10~"(0, 10]", AGE>10 & AGE <=25 ~"(10,25]", AGE>25 & AGE<=40~"(25,40]", AGE>40 & AGE<=60~"(40,60]", AGE>60 ~"60+" ))
+
+p
+```
+
+
+
+
+```{r}
+base_f1[base_f1$CODCOLLEGE=="CAPR804",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR804",]$PARTMOD<0]=mean(base_f1[base_f1$CODCOLLEGE=="CAPR804",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR804",]$PARTMOD>0])
+base_f1[base_f1$CODCOLLEGE=="CAPR803",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR803",]$PARTMOD<0]=mean(base_f1[base_f1$CODCOLLEGE=="CAPR803",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR803",]$PARTMOD>0])
+base_f1[base_f1$CODCOLLEGE=="CAPR802",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR802",]$PARTMOD<0]=mean(base_f1[base_f1$CODCOLLEGE=="CAPR802",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR802",]$PARTMOD>0])
+base_f1[base_f1$CODCOLLEGE=="CAPR701",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR701",]$PARTMOD<0]=mean(base_f1[base_f1$CODCOLLEGE=="CAPR701",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CAPR701",]$PARTMOD>0])
+base_f1[base_f1$CODCOLLEGE=="CEMACGM1",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CEMACGM1",]$PARTMOD==0.99]=mean(base_f1[base_f1$CODCOLLEGE=="CEMACGM1",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CEMACGM1",]$PARTMOD!=0.99])
+base_f1[base_f1$CODCOLLEGE=="CEMACGM2",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CEMACGM2",]$PARTMOD==0.98]=mean(base_f1[base_f1$CODCOLLEGE=="CEMACGM2",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="CEMACGM2",]$PARTMOD!=0.98])
+base_f1[base_f1$CODCOLLEGE=="ELITE SA 1",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="ELITE SA 1",]$PARTMOD==0.99]=mean(base_f1[base_f1$CODCOLLEGE=="ELITE SA 2",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="ELITE SA 2",]$PARTMOD!=0.98])
+base_f1[base_f1$CODCOLLEGE=="ELITE SA 2",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="ELITE SA 2",]$PARTMOD==0.98]=mean(base_f1[base_f1$CODCOLLEGE=="ELITE SA 2",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="ELITE SA 2",]$PARTMOD!=0.98])
+base_f1[base_f1$CODCOLLEGE=="1",]$PARTMOD[base_f1[base_f1$CODCOLLEGE=="1",]$PARTMOD==0.99]=0
+base_f1[base_f1$MATBENEF==2248796,]$STATUT_ASSURE <- "E"
+base_f1[is.na(base_f1$N),26:58] <- 0
+```
+
+
+
+```{r}
+summary(base_f1)
+```
+
+
+
+ANALYSE
+
+- PHARMACIE
+
+```{r}
+base_ph <- base_f1 %>% dplyr::select(MATBENEF,MATASSURE,STATUT_ASSURE,TM:NBSIN_PHAR,FRQ_PHAR,NBSIN_TOT,EXPOSITION,AGE, ends_with("_PHARMACIE"),BASEDECOMPTÉE_TOT,REMBOURSE_TOT,PARTMOD,TRANCHEAGE,TERRITTOIRE, NOMBRE_PERSONNE,NBRE_ENFANTS)
+```
+
+
+
+```{r}
+f<- base_ph %>%filter(TRANCHEAGE=='(0, 10]')
+MOINS_10ANS=sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='(10,25]')
+ENTRE_10_ET_25 =sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='(25,40]')
+ENTRE_25_ET_40 =sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='(40,60]')
+ENTRE_40_ET_60 =sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='60+')
+PLUS_DE_60 =sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+t <- data.frame(MOINS_10ANS,ENTRE_10_ET_25,ENTRE_25_ET_40,ENTRE_40_ET_60,PLUS_DE_60)
+t %>% gather(key="TRANCHE_AGE", value = "PROPORTION") %>% arrange(desc(TRANCHE_AGE)) %>%
+  mutate(lab.ypos = cumsum(PROPORTION) - 0.5*PROPORTION)%>% ggplot(aes(x="", y=PROPORTION, fill = TRANCHE_AGE))+geom_bar(width = 1, stat = "identity", color="white")+coord_polar("y", start = 0)+geom_text(aes(y = lab.ypos,label = percent(PROPORTION)), size=3, color = "white")+labs(title = "POURCENTAGE DU MONTANT DES SINISTRES SUIVANT LES TRANCHES D'AGEs ")+scale_fill_grey()+theme_void()
+```
+
+
+
+```{r}
+f<- base_ph %>%filter(TRANCHEAGE=='(0, 10]')
+MOINS_10ANS=mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='(10,25]')
+ENTRE_10_ET_25 =mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='(25,40]')
+ENTRE_25_ET_40 =mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='(40,60]')
+ENTRE_40_ET_60 =mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+f<- base_ph %>%filter(TRANCHEAGE=='60+')
+PLUS_DE_60 =mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+t <- data.frame(MOINS_10ANS,ENTRE_10_ET_25,ENTRE_25_ET_40,ENTRE_40_ET_60,PLUS_DE_60)
+colnames(t) <- c('(0, 10]','(10,25]','(25,40]','(40,60]','60+')
+t %>% gather(key="TRANCHE_AGE", value = "MONTANT_MOYEN" ) %>% ggplot(aes(x=TRANCHE_AGE, y=MONTANT_MOYEN, group=1))+geom_line(colour='Royalblue')+geom_point()
+```
+
+
+
+```{r}
+f<- base_ph %>%filter(TRANCHEAGE=='(0, 10]')
+MOINS_10ANS=c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+f<- base_ph %>%filter(TRANCHEAGE=='(10,25]')
+ENTRE_10_ET_25 =c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+f<- base_ph %>%filter(TRANCHEAGE=='(25,40]')
+ENTRE_25_ET_40 =c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+f<- base_ph %>%filter(TRANCHEAGE=='(40,60]')
+ENTRE_40_ET_60 =c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+f<- base_ph %>%filter(TRANCHEAGE=='60+')
+PLUS_DE_60 =c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+t <- data.frame(MOINS_10ANS,ENTRE_10_ET_25,ENTRE_25_ET_40,ENTRE_40_ET_60,PLUS_DE_60)
+
+colnames(t) <- c('(0, 10]','(10,25]','(25,40]','(40,60]','60+')
+
+t<- t %>% gather(key="TRANCHE_AGE", value = "MONTANT_MOYEN" )
+t$M_E <- rep(c('M','E1','E2'),5)
+t%>%  ggplot(aes(x=TRANCHE_AGE, y=MONTANT_MOYEN, group=M_E, colour=M_E))+geom_line()+geom_point()
+```
+
+
+
+
+```{r}
+f<- base_ph %>%filter(STATUT_ASSURE=='E')
+ENFANT=sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+
+f<- base_ph %>%filter(STATUT_ASSURE=='A')
+ASSURE_PRINCIPAL =sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+
+f<- base_ph %>%filter(STATUT_ASSURE=='C')
+CONJOINT =sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+
+f<- base_ph %>%filter(STATUT_ASSURE=='G')
+GENITEUR =sum(f$REMBOURSÉ_PHARMACIE, na.rm = T)/sum(f$REMBOURSE_TOT, na.rm = T)
+
+
+t <- data.frame(ENFANT,ASSURE_PRINCIPAL,CONJOINT,GENITEUR)
+
+t %>% gather(key="STATUT_ASSURE", value = "PROPORTION") %>% arrange(desc(STATUT_ASSURE)) %>%
+  mutate(lab.ypos = cumsum(PROPORTION) - 0.5*PROPORTION)%>% ggplot(aes(x="", y=PROPORTION, fill = STATUT_ASSURE))+geom_bar(width = 1, stat = "identity", color="white")+coord_polar("y", start = 0)+geom_text(aes(y = lab.ypos,label = percent(PROPORTION)), size=3, color = "white")+labs(title = "POURCENTAGE DU MONTANT DES SINISTRES SUIVANT LE STATUT ASSURE ")+scale_fill_grey()+theme_void()
+```
+
+
+
+
+```{r}
+f<- base_ph %>%filter(STATUT_ASSURE=='E')
+ENFANT=mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+
+f<- base_ph %>%filter(STATUT_ASSURE=='C')
+CONJOINT =mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+
+f<- base_ph %>%filter(STATUT_ASSURE=='A')
+ASSURE_PRINCIPAL =mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+
+f<- base_ph %>%filter(STATUT_ASSURE=='G')
+GENITEUR =mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)
+
+t <- data.frame(ENFANT,CONJOINT,ASSURE_PRINCIPAL,GENITEUR)
+
+# colnames(t) <- c('(0, 10]','(10,25]','(25,40]','(40,60]','60+')
+t %>% gather(key="STATUT_ASSURE", value = "MONTANT_MOYEN" ) %>% ggplot(aes(x=STATUT_ASSURE, y=MONTANT_MOYEN, group=1))+geom_line(colour='Royalblue')+geom_point()
+```
+
+
+
+
+```{r}
+f<- base_ph %>%filter(STATUT_ASSURE=='E')
+ENFANT=c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+f<- base_ph %>%filter(STATUT_ASSURE=='A')
+ASSURE_PRINCIPAL =c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+f<- base_ph %>%filter(STATUT_ASSURE=='C')
+CONJOINT =c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+f<- base_ph %>%filter(STATUT_ASSURE=='G')
+GENITEUR =c(mean(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)-sd(f$REMBOURSÉ_PHARMACIE, na.rm = T), mean(f$REMBOURSÉ_PHARMACIE, na.rm = T)+sd(f$REMBOURSÉ_PHARMACIE, na.rm = T))
+
+
+t <- data.frame(ENFANT,ASSURE_PRINCIPAL,CONJOINT,GENITEUR)
+
+colnames(t) <- c('E','A','C','G')
+t<- t %>% gather(key="STATUT_ASSURE", value = "MONTANT_MOYEN" )
+t$M_E <- rep(c('M','E1','E2'),4)
+t%>%  ggplot(aes(x=STATUT_ASSURE, y=MONTANT_MOYEN, group=M_E, colour=M_E))+geom_line()+geom_point()
+```
+
+
+
+```{r}
+d<- base_ph %>% filter(STATUT_ASSURE!="G")%>% group_by(NOMBRE_PERSONNE) %>% dplyr::summarise(
+  MOYENNE=mean(REMBOURSÉ_PHARMACIE, na.rm = T),
+  ECART_TYPE=sd(REMBOURSÉ_PHARMACIE, na.rm = T),
+  ECART_1=mean(REMBOURSÉ_PHARMACIE, na.rm = T)-sd(REMBOURSÉ_PHARMACIE, na.rm = T),
+  ECART_2=mean(REMBOURSÉ_PHARMACIE, na.rm = T)+sd(REMBOURSÉ_PHARMACIE, na.rm = T)
+)
+
+d %>% ggplot(aes(x=as.factor(NOMBRE_PERSONNE), y=MOYENNE, group=1))+geom_line(colour='Royalblue')+geom_point()+labs(x="NOMBRE DE PERSONNES")
+```
+
+
+
+```{r}
+table(base_ph$NOMBRE_PERSONNE)
+```
+
+
+
+```{r}
+p<- ggplot(base_ph, aes(x=NOMBRE_PERSONNE))+geom_histogram(breaks = seq(1,15,by=1), fill="Royalblue", colour="black")
+p
+```
+
+
+
+```{r}
+# base_ph$PARTMOD[base_ph$PARTMOD<0] <- mean(base_ph$PARTMOD[base_ph$PARTMOD>0])
+# base_ph$PARTMOD[is.nan(base_ph$PARTMOD)] <- mean(base_ph$PARTMOD[base_ph$PARTMOD>0])
+# base_ph$PARTMOD[is.na(base_ph$PARTMOD)] <-mean(base_ph$PARTMOD[base_ph$PARTMOD>0])
+
+base_ph %>% ggplot(aes(x="",y=PARTMOD))+
+   geom_boxplot()+geom_jitter(colour=2, alpha=0.1)
+```
+
+
+
+```{r}
+mean(base_ph$PARTMOD, na.rm = T)
+sd(base_ph$PARTMOD, na.rm = T)
+quantile(base_ph$PARTMOD,0.95 ,na.rm = T)
+quantile(base_ph$PARTMOD,0.25 ,na.rm = T)
+quantile(base_ph$PARTMOD,0.99 ,na.rm = T)
+nrow(base_ph[is.na(base_ph$PARTMOD),])/nrow(base_ph)
+sd(base_ph$PARTMOD, na.rm = T)/mean(base_ph$PARTMOD, na.rm = T)
+```
+
+
+
+```{r}
+base_phnotnull<- base_ph %>% filter(REMBOURSÉ_PHARMACIE>0)
+(q95 <- quantile(base_phnotnull$REMBOURSÉ_PHARMACIE,0.95))
+base_ph_attri<- base_ph%>% filter(REMBOURSÉ_PHARMACIE<q95)
+base_ph_cat<- base_ph%>% filter(REMBOURSÉ_PHARMACIE>q95)
+```
+
+
+```{r}
+summary(base_ph_attri)
+```
+
+
+```{r}
+base_ph_attri <- base_ph_attri %>% mutate(COUT_MOYEN_PHAR=case_when(REMBOURSÉ_PHARMACIE==0|NBSIN_PHAR==0 ~ 0,
+                                                                    NBSIN_PHAR!=0 ~ REMBOURSÉ_PHARMACIE/NBSIN_PHAR))
+base_ph_attri %>% filter(COUT_MOYEN_PHAR!=0) %>% ggplot(aes(x=COUT_MOYEN_PHAR))+geom_histogram(color="black", fill="red", bins = 100)
+```
+
+
+```{r}
+nrow(base_ph_cat)/nrow(base_phnotnull)
+sum(base_ph_cat$REMBOURSÉ_PHARMACIE)/sum(base_phnotnull$REMBOURSÉ_PHARMACIE)
+(prime.cat <- sum(base_ph_cat$REMBOURSÉ_PHARMACIE)/(3*nrow(base_ph)))
+(mean(base_ph_attri$REMBOURSÉ_PHARMACIE, na.rm=TRUE)/3)
+(median(base_ph_attri$REMBOURSÉ_PHARMACIE, na.rm=TRUE))
+mean(base_ph_attri$REMBOURSÉ_PHARMACIE[base_ph_attri$REMBOURSÉ_PHARMACIE>0])/3
+median(base_ph_attri$REMBOURSÉ_PHARMACIE[base_ph_attri$REMBOURSÉ_PHARMACIE>0])
+quantile(base_ph_attri$REMBOURSÉ_PHARMACIE[base_ph_attri$REMBOURSÉ_PHARMACIE>0], 0.75)
+
+```
+
+
+
+```{r}
+p<- ggplot(base_ph_attri, aes(x="",y=COUT_MOYEN_PHAR))+geom_boxplot()+geom_jitter(colour=2, alpha=0.1)
+p
+```
+
+
+
+
+
+```{r}
+cor(base_ph_attri$REMBOURSÉ_PHARMACIE[base_ph_attri$REMBOURSÉ_PHARMACIE>0],base_ph_attri$AGE[base_ph_attri$REMBOURSÉ_PHARMACIE>0] , method = "pearson")
+cor(base_ph_attri$REMBOURSÉ_PHARMACIE[base_ph_attri$REMBOURSÉ_PHARMACIE>0],base_ph_attri$AGE[base_ph_attri$REMBOURSÉ_PHARMACIE>0] , method = "kendall")
+cor(base_ph_attri$REMBOURSÉ_PHARMACIE[base_ph_attri$REMBOURSÉ_PHARMACIE>0],base_ph_attri$AGE[base_ph_attri$REMBOURSÉ_PHARMACIE>0] , method = "spearman")
+
+
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$COUT_MOYEN_PHAR>0],base_ph_attri$AGE[base_ph_attri$COUT_MOYEN_PHAR>0] , method = "pearson")
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$COUT_MOYEN_PHAR>0],base_ph_attri$AGE[base_ph_attri$COUT_MOYEN_PHAR>0] , method = "kendall")
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$COUT_MOYEN_PHAR>0],base_ph_attri$AGE[base_ph_attri$COUT_MOYEN_PHAR>0] , method = "spearman")
+
+
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$COUT_MOYEN_PHAR>0],base_ph_attri$NOMBRE_PERSONNE[base_ph_attri$COUT_MOYEN_PHAR>0] , method = "pearson")
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$COUT_MOYEN_PHAR>0],base_ph_attri$NOMBRE_PERSONNE[base_ph_attri$COUT_MOYEN_PHAR>0] , method = "kendall")
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$COUT_MOYEN_PHAR>0],base_ph_attri$NOMBRE_PERSONNE[base_ph_attri$COUT_MOYEN_PHAR>0] , method = "spearman")
+
+
+cor(base_ph_attri$REMBOURSÉ_PHARMACIE[base_ph_attri$REMBOURSÉ_PHARMACIE>0] , base_ph_attri$FRQ_PHAR[base_ph_attri$REMBOURSÉ_PHARMACIE>0])
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$REMBOURSÉ_PHARMACIE>0] , base_ph_attri$FRQ_PHAR[base_ph_attri$REMBOURSÉ_PHARMACIE>0])
+cor(base_ph_attri$COUT_MOYEN_PHAR[base_ph_attri$REMBOURSÉ_PHARMACIE>0] , base_ph_attri$NBSIN_PHAR[base_ph_attri$REMBOURSÉ_PHARMACIE>0])
+
+
+quantile(base_ph_attri$COUT_MOYEN_PHAR,na.rm = T, probs=c(0.25,0.5,0.75,0.95))
+quantile(base_ph_attri$FRQ_PHAR,na.rm = T, probs=c(0.25,0.5,0.75,0.95))
+
+
+
+
+base_ph_attri<- base_ph_attri %>% mutate(CL_CM =  case_when(COUT_MOYEN_PHAR<=6179.295|REMBOURSÉ_PHARMACIE==0 ~"(0,6179.295]",
+                                            COUT_MOYEN_PHAR>6179.295 & COUT_MOYEN_PHAR<=8692.190~"(6179.295,8692.190]",
+                                            COUT_MOYEN_PHAR>8692.190 & COUT_MOYEN_PHAR<=14357.378~"(8692.190,14357.378]",
+                                            COUT_MOYEN_PHAR>14357.378~"14357.378+"),
+                         CL_FREQ= case_when(FRQ_PHAR<=2.001370~"(0,2.001370]",
+                                            FRQ_PHAR>2.001370&FRQ_PHAR<=5.312727 ~ "(2.001370,5.312727]",
+                                            FRQ_PHAR>5.312727&FRQ_PHAR<=12.160382 ~ "(5.312727,12.160382]",
+                                            FRQ_PHAR>12.160382~"12.160382+") )
+
+tb<- table(base_ph_attri$CL_CM, base_ph_attri$CL_FREQ)
+chisq.test(tb)
+
+```
+
+
+
+```{r}
+base_ph_attri %>% filter(REMBOURSÉ_PHARMACIE>0) %>% summary()
+```
+
+
+
+```{r}
+modele_0=glm(COUT_MOYEN_PHAR~STATUT_ASSURE+
+               TRANCHEAGE+
+               TERRITTOIRE+
+               NOMBRE_PERSONNE+
+               NBRE_ENFANTS+
+               PARTMOD,
+             family=Gamma(link ="log"),
+             data=base_ph_attri%>% 
+               filter(COUT_MOYEN_PHAR>0))
+
+summary(modele_0)
+## les résultats de l'estimation +PARTMOD
+```
+
+
+```{r}
+1-(11428/12927)
+```
+
+
+
+
+```{r}
+ with(summary(modele_0), 1-deviance/null.deviance)
+```
+
+
+```{r}
+plot(modele_0)
+```
+
+
+
+
+
+
+
+```{r}
+stp_aic<- MASS::stepAIC(modele_0, direction = "backward")
+stp_aic
+```
+
+
+```{r}
+anova(modele_0,test="Chisq")
+```
+
+
+```{r}
+write.csv2(base_Sin_ind,"C:/Users/hakim.sabi/Desktop/MEMOIRE/bases_pour_analyses/baseSinisIndivStat_desc.csv")
+write.csv2(base_f1,"C:/Users/hakim.sabi/Desktop/MEMOIRE/bases_pour_analyses/baseSinisAgreStat_desc.csv")
+```
+
+
+
+```{r}
+write.csv2(bene_protege0,"C:/Users/hakim.sabi/Desktop/MEMOIRE/bases_pour_analyses/benef_protege0.csv")
+```
+
